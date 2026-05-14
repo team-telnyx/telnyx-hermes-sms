@@ -42,3 +42,23 @@ def test_api_constants():
     assert adapter.TELNYX_MESSAGES_URL.endswith('/messages')
     assert adapter.DEFAULT_WEBHOOK_PATH == '/webhooks/telnyx/sms'
     assert adapter.MAX_SMS_LENGTH == 1600
+
+
+def test_plugin_package_entrypoint_exists():
+    init_file = ROOT / '__init__.py'
+    assert init_file.exists(), 'Hermes directory plugins require __init__.py'
+    text = init_file.read_text()
+    assert 'register' in text
+
+
+def test_manifest_documents_code_supported_env_vars():
+    manifest = yaml.safe_load((ROOT / 'plugin.yaml').read_text())
+    env_names = {item['name'] for block in ('requires_env', 'optional_env') for item in manifest.get(block, [])}
+    assert 'TELNYX_SMS_API_BASE' in env_names
+    assert 'TELNYX_SMS_SIGNATURE_TOLERANCE' in env_names
+
+
+def test_env_example_includes_live_test_guard():
+    env_example = (ROOT / '.env.example').read_text()
+    assert 'TELNYX_SMS_LIVE_TEST=0' in env_example
+    assert 'TELNYX_SMS_TEST_TO=' in env_example

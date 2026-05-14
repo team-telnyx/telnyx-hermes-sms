@@ -123,7 +123,8 @@ async def test_handle_webhook_creates_message_event(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_handle_webhook_ignores_delivery_receipts(monkeypatch):
+@pytest.mark.parametrize('event_type', ['message.sent', 'message.finalized', 'message.delivered'])
+async def test_handle_webhook_ignores_lifecycle_events(monkeypatch, event_type):
     sms = make_adapter(monkeypatch)
     called = False
 
@@ -132,7 +133,7 @@ async def test_handle_webhook_ignores_delivery_receipts(monkeypatch):
         called = True
 
     sms.handle_message = fake_handle
-    payload = {'data': {'event_type': 'message.sent', 'payload': {'id': 'x'}}}
+    payload = {'data': {'event_type': event_type, 'payload': {'id': 'x'}}}
     request = make_mocked_request('POST', '/webhooks/telnyx/sms', headers={'Content-Type': 'application/json'})
     request._read_bytes = __import__('json').dumps(payload).encode()
 
@@ -150,3 +151,16 @@ def test_env_enablement(monkeypatch):
     seed = adapter._env_enablement()
     assert seed['from_number'] == '+15550000001'
     assert seed['home_channel']['chat_id'] == '+15550000002'
+
+
+def test_validate_config_accepts_env_without_extra(monkeypatch):
+    monkeypatch.setenv('TELNYX_API_KEY', 'KEY_test')
+    monkeypatch.setenv('TELNYX_SMS_FROM_NUMBER', '+15550000001')
+    assert adapter.validate_config(PlatformConfig(enabled=True, extra={})) is True
+
+
+def test_signature_required_without_public_key_is_invalid(monkeypatch):
+    sms = make_adapter(monkeypatch)
+    sms._require_signature = True
+    sms._public_key = ''
+    assert sms._validate_telnyx_signature(b'{}', {}) is False

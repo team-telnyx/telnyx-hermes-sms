@@ -23,6 +23,10 @@ optional_env:
     description: "Optional Telnyx Messaging Profile ID to attach on outbound sends"
     prompt: "Messaging Profile ID"
     password: false
+  - name: TELNYX_SMS_API_BASE
+    description: "Telnyx API base URL override (default: https://api.telnyx.com/v2)"
+    prompt: "Telnyx API base URL"
+    password: false
   - name: TELNYX_SMS_WEBHOOK_HOST
     description: "Webhook bind host (default: 127.0.0.1)"
     prompt: "Webhook host"
@@ -42,6 +46,10 @@ optional_env:
   - name: TELNYX_SMS_REQUIRE_SIGNATURE
     description: "Require valid Telnyx webhook signatures (recommended in production)"
     prompt: "Require webhook signature? (true/false)"
+    password: false
+  - name: TELNYX_SMS_SIGNATURE_TOLERANCE
+    description: "Webhook signature timestamp tolerance in seconds (default: 300; 0 disables freshness check)"
+    prompt: "Signature tolerance seconds"
     password: false
   - name: TELNYX_SMS_ALLOWED_USERS
     description: "Comma-separated E.164 phone numbers allowed to talk to the bot"

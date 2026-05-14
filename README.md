@@ -12,29 +12,96 @@ safe, reversible, and consistent with Hermes' platform-plugin architecture.
 
 | File | Purpose |
 |------|---------|
-| `adapter.py` | Hermes platform adapter + `register(ctx)` plugin entry point |
+| `__init__.py` | Hermes directory-plugin entry point that exposes `register(ctx)` |
+| `adapter.py` | Hermes platform adapter implementation |
 | `plugin.yaml` | Platform plugin metadata and config UI env var definitions |
+| `.env.example` | Copyable environment variable template |
 | `tests/test_telnyx_sms_static.py` | Manifest/static/API shape checks |
 | `tests/test_telnyx_sms_runtime.py` | Mocked outbound send and inbound webhook runtime tests |
-| `tests/test_telnyx_sms_live.py` | Optional live SMS send test |
+| `tests/test_telnyx_sms_live.py` | Optional live SMS send test, gated by `TELNYX_SMS_LIVE_TEST=1` |
+
+## Fresh clone setup
+
+Requirements:
+
+- Python 3.10+; Python 3.12 is recommended because local Hermes checkouts may
+  use modern typing syntax.
+- A local Hermes Agent checkout for tests that import `gateway.*` modules.
+  Set `HERMES_AGENT_ROOT` if it is not at `~/.hermes/hermes-agent`.
+- `uv` is recommended for reproducible local test dependencies.
+
+```bash
+git clone https://github.com/team-telnyx/telnyx-hermes-sms.git
+cd telnyx-hermes-sms
+export HERMES_AGENT_ROOT="$HOME/.hermes/hermes-agent"  # adjust if needed
+uv run --extra test python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
+```
+
+Without `uv`, use any Python 3.10+ virtualenv:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[test]"
+export HERMES_AGENT_ROOT="$HOME/.hermes/hermes-agent"
+python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
+```
 
 ## Integration into hermes-agent
 
-### Plugin path
+### User plugin install
 
 Copy this repository's plugin files into a Hermes plugin directory:
+
+```bash
+mkdir -p ~/.hermes/plugins/telnyx_sms
+cp __init__.py adapter.py plugin.yaml ~/.hermes/plugins/telnyx_sms/
+```
+
+Expected plugin tree:
 
 ```text
 ~/.hermes/plugins/telnyx_sms/
   plugin.yaml
+  __init__.py
   adapter.py
 ```
 
-Or contribute upstream as a bundled platform plugin:
+Enable the plugin in Hermes. Depending on the Hermes CLI version, use the
+plugin manifest name/key shown by `hermes plugins list`; for this plugin that is
+usually `telnyx-sms-platform` or the directory key `telnyx_sms`:
+
+```bash
+hermes plugins list
+hermes plugins enable telnyx-sms-platform  # or: hermes plugins enable telnyx_sms
+```
+
+Then configure credentials and enable the platform:
+
+```bash
+cp .env.example ~/.hermes/.env
+# Edit ~/.hermes/.env with your Telnyx values.
+```
+
+```yaml
+# ~/.hermes/config.yaml
+gateway:
+  platforms:
+    telnyx_sms:
+      enabled: true
+```
+
+Restart the Hermes gateway after installing/enabling the plugin so the platform
+registry can discover `telnyx_sms`.
+
+### Bundled upstream plugin path
+
+For an upstream Hermes contribution, copy the plugin under:
 
 ```text
 plugins/platforms/telnyx_sms/
   plugin.yaml
+  __init__.py
   adapter.py
 ```
 
@@ -55,6 +122,7 @@ No core Hermes code changes are required. Hermes' platform registry handles:
 | Field | Value |
 |-------|-------|
 | Platform ID | `telnyx_sms` |
+| Plugin manifest name | `telnyx-sms-platform` |
 | Outbound API | `POST https://api.telnyx.com/v2/messages` |
 | Inbound webhook | `/webhooks/telnyx/sms` |
 | Auth | `TELNYX_API_KEY` Bearer token |
@@ -84,11 +152,12 @@ Optional:
 
 ```bash
 export TELNYX_MESSAGING_PROFILE_ID="400..."
+export TELNYX_SMS_API_BASE="https://api.telnyx.com/v2"
 export TELNYX_SMS_WEBHOOK_HOST="0.0.0.0"      # default: 127.0.0.1
 export TELNYX_SMS_WEBHOOK_PORT=8087           # default: 8087
 export TELNYX_SMS_WEBHOOK_PATH="/webhooks/telnyx/sms"
 export TELNYX_SMS_HOME_CHANNEL="+15551230001" # cron/default delivery
-export TELNYX_SMS_API_BASE="https://api.telnyx.com/v2"
+export TELNYX_SMS_SIGNATURE_TOLERANCE=300      # seconds; 0 disables freshness check
 ```
 
 ## Hermes configuration
@@ -116,28 +185,41 @@ Configure the Telnyx Messaging Profile inbound webhook URL to:
 https://your-public-host.example/webhooks/telnyx/sms
 ```
 
-The adapter processes `message.received` events and ignores delivery receipts
-or other lifecycle webhooks so they do not trigger agent replies.
+For local development, expose the webhook listener with a tunnel such as
+Cloudflare Tunnel or ngrok and set `TELNYX_SMS_WEBHOOK_HOST=0.0.0.0` if the
+listener must bind beyond localhost.
+
+The adapter processes inbound `message.received` events and ignores other
+message lifecycle webhooks so delivery receipts do not trigger agent replies.
 
 ## Security notes
 
 - Use `TELNYX_SMS_ALLOWED_USERS` in production unless every sender should be
   allowed.
 - Use `TELNYX_PUBLIC_KEY` + `TELNYX_SMS_REQUIRE_SIGNATURE=true` in production.
+- If `TELNYX_PUBLIC_KEY` is set, incoming webhooks are signature-checked. If
+  `TELNYX_SMS_REQUIRE_SIGNATURE=true`, invalid/missing signatures are rejected.
 - PyNaCl is only required when signature validation is enabled.
 - Phone numbers are redacted in logs where Hermes' helpers support it.
 
 ## Running tests
 
 ```bash
-# No credentials needed
-python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
+# No credentials needed; does not send SMS
+uv run --extra test python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
 
-# Live test (sends a real SMS)
+# Full suite; live test skips unless explicitly enabled
+uv run --extra test python -m pytest -q
+```
+
+Live SMS send test requires an explicit safety flag and sends a real SMS:
+
+```bash
 export TELNYX_API_KEY="KEY..."
 export TELNYX_SMS_FROM_NUMBER="+15551234567"
 export TELNYX_SMS_TEST_TO="+15557654321"
-python -m pytest tests/test_telnyx_sms_live.py -q -m live
+export TELNYX_SMS_LIVE_TEST=1
+uv run --extra test python -m pytest tests/test_telnyx_sms_live.py -q -m live
 ```
 
 ## Linear

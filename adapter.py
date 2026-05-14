@@ -361,7 +361,7 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
         if not isinstance(inner, dict):
             return web.json_response({"ok": True})
 
-        if event_type and event_type not in {"message.received", "message.finalized"}:
+        if event_type and event_type != "message.received":
             # Delivery receipts and other message lifecycle events are useful
             # for logging but should not trigger an agent response.
             return web.json_response({"ok": True})
