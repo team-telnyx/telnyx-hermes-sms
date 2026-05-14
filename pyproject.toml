@@ -1,0 +1,27 @@
+[project]
+name = "telnyx-hermes-sms"
+version = "0.1.0"
+description = "Telnyx SMS/MMS platform adapter contribution for Hermes Agent"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Telnyx AI FDE" }]
+dependencies = [
+  "aiohttp>=3.9",
+]
+
+[project.optional-dependencies]
+signature = ["PyNaCl>=1.5"]
+test = [
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "PyYAML>=6",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+  "live: requires live Telnyx credentials and sends a real SMS",
+]
