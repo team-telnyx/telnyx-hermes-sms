@@ -38,17 +38,7 @@ class FakeSession:
 def make_adapter(monkeypatch):
     monkeypatch.setenv('TELNYX_API_KEY', 'KEY_test')
     monkeypatch.setenv('TELNYX_SMS_FROM_NUMBER', '+15550000001')
-    # Hermes only allows dynamic Platform("...") values after the plugin has
-    # registered. Runtime does this before adapter_factory runs; tests mirror it.
-    from gateway.platform_registry import PlatformEntry, platform_registry
-
-    if not platform_registry.is_registered('telnyx_sms'):
-        platform_registry.register(PlatformEntry(
-            name='telnyx_sms',
-            label='Telnyx SMS',
-            adapter_factory=lambda cfg: None,
-            check_fn=lambda: True,
-        ))
+    # Platform is pre-registered by conftest._ensure_telnyx_sms_registered().
     cfg = PlatformConfig(enabled=True, extra={})
     return adapter.TelnyxSmsAdapter(cfg)
 
@@ -101,7 +91,7 @@ async def test_handle_webhook_creates_message_event(monkeypatch):
             'payload': {
                 'id': 'msg-in-1',
                 'from': {'phone_number': '+15550000002'},
-                'to': {'phone_number': '+15550000001'},
+                'to': [{'phone_number': '+15550000001', 'status': 'webhook_delivered'}],
                 'text': 'hello from telnyx',
                 'media': [{'url': 'https://example.com/cat.jpg'}],
             },
@@ -164,3 +154,57 @@ def test_signature_required_without_public_key_is_invalid(monkeypatch):
     sms._require_signature = True
     sms._public_key = ''
     assert sms._validate_telnyx_signature(b'{}', {}) is False
+
+
+def test_signature_verification_with_base64_keypair(monkeypatch):
+    """Verify base64-encoded Ed25519 key/signature (Telnyx's actual format)."""
+    pytest.importorskip('nacl')
+    import base64
+    import time as _time
+    from nacl.signing import SigningKey
+
+    signing_key = SigningKey.generate()
+    verify_key = signing_key.verify_key
+    public_key_b64 = base64.b64encode(bytes(verify_key)).decode()
+
+    body = b'{"data":{"event_type":"message.received"}}'
+    timestamp = str(int(_time.time()))
+    signed = signing_key.sign(f"{timestamp}|".encode() + body)
+    signature_b64 = base64.b64encode(signed.signature).decode()
+
+    sms = make_adapter(monkeypatch)
+    sms._public_key = public_key_b64
+    sms._require_signature = True
+
+    result = sms._validate_telnyx_signature(body, {
+        'Telnyx-Signature-Ed25519': signature_b64,
+        'Telnyx-Timestamp': timestamp,
+    })
+    assert result is True, 'base64 key + base64 signature must validate'
+
+
+def test_signature_rejects_wrong_key(monkeypatch):
+    """Verify that a valid signature from a different key is rejected."""
+    pytest.importorskip('nacl')
+    import base64
+    import time as _time
+    from nacl.signing import SigningKey
+
+    signing_key = SigningKey.generate()
+    wrong_key = SigningKey.generate().verify_key
+    public_key_b64 = base64.b64encode(bytes(wrong_key)).decode()
+
+    body = b'{"test": true}'
+    timestamp = str(int(_time.time()))
+    signed = signing_key.sign(f"{timestamp}|".encode() + body)
+    signature_b64 = base64.b64encode(signed.signature).decode()
+
+    sms = make_adapter(monkeypatch)
+    sms._public_key = public_key_b64
+    sms._require_signature = True
+
+    result = sms._validate_telnyx_signature(body, {
+        'Telnyx-Signature-Ed25519': signature_b64,
+        'Telnyx-Timestamp': timestamp,
+    })
+    assert result is False, 'wrong key must reject'

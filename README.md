@@ -1,7 +1,7 @@
 # Telnyx SMS — Hermes Agent Contribution
 
 This repository contains the Telnyx SMS/MMS platform adapter for
-[Hermes Agent](https://github.com/team-telnyx/hermes-agent).
+[Hermes Agent](https://github.com/NousResearch/hermes-agent).
 
 It is a **plugin-first platform adapter**. Hermes already has a built-in
 `gateway/platforms/sms.py`, but that adapter is Twilio-based. This contribution
@@ -232,4 +232,4 @@ OpenClaw equivalent: AIF-125 — Telnyx SMS Channel.
 
 - [Telnyx Messaging API](https://developers.telnyx.com/docs/api/v2/messaging)
 - [Telnyx Messaging webhooks](https://developers.telnyx.com/docs/messaging/messages/webhooks)
-- [Hermes platform adapter guide](https://github.com/team-telnyx/hermes-agent/blob/main/website/docs/developer-guide/adding-platform-adapters.md)
+- [Hermes platform adapter guide](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/adding-platform-adapters.md)

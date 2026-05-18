@@ -53,9 +53,17 @@ def _split_csv(value: str | Iterable[str] | None) -> list[str]:
 
 
 def _first_phone(value: Any) -> str:
-    """Extract an E.164 number from Telnyx webhook-ish objects."""
+    """Extract an E.164 number from Telnyx webhook-ish objects.
+
+    Telnyx delivers ``from`` as a dict and ``to`` as a list of dicts.
+    Handle str, dict, and list-of-dicts.
+    """
     if isinstance(value, str):
         return value.strip()
+    if isinstance(value, list):
+        if value:
+            return _first_phone(value[0])
+        return ""
     if isinstance(value, dict):
         for key in ("phone_number", "number", "address"):
             raw = value.get(key)
@@ -151,7 +159,13 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
         self._api_base = (_env("TELNYX_SMS_API_BASE") or str(extra.get("api_base", TELNYX_API_BASE))).rstrip("/")
         self._messages_url = f"{self._api_base}/messages"
         self._webhook_host = _env("TELNYX_SMS_WEBHOOK_HOST") or str(extra.get("webhook_host", DEFAULT_WEBHOOK_HOST))
-        self._webhook_port = int(_env("TELNYX_SMS_WEBHOOK_PORT") or str(extra.get("webhook_port", DEFAULT_WEBHOOK_PORT)))
+        try:
+            self._webhook_port = int(_env("TELNYX_SMS_WEBHOOK_PORT") or str(extra.get("webhook_port", DEFAULT_WEBHOOK_PORT)))
+        except ValueError:
+            raw_port = _env("TELNYX_SMS_WEBHOOK_PORT") or str(extra.get("webhook_port", ""))
+            msg = f"[telnyx_sms] TELNYX_SMS_WEBHOOK_PORT is not a valid integer: {raw_port!r}"
+            logger.error(msg)
+            self._webhook_port = DEFAULT_WEBHOOK_PORT
         self._webhook_path = _env("TELNYX_SMS_WEBHOOK_PATH") or str(extra.get("webhook_path", DEFAULT_WEBHOOK_PATH))
         self._public_key = _env("TELNYX_PUBLIC_KEY") or str(extra.get("public_key", "")).strip()
         self._require_signature = _truthy(_env("TELNYX_SMS_REQUIRE_SIGNATURE") or str(extra.get("require_signature", "")))
@@ -177,6 +191,18 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
             logger.error(msg)
             self._set_fatal_error("telnyx_sms_missing_public_key", msg, retryable=False)
             return False
+
+        if self._public_key or self._require_signature:
+            try:
+                from nacl.signing import VerifyKey  # noqa: F401
+            except ImportError:
+                msg = (
+                    "[telnyx_sms] PyNaCl is required for webhook signature validation but is not installed. "
+                    "Install it with: pip install PyNaCl"
+                )
+                logger.error(msg)
+                self._set_fatal_error("telnyx_sms_missing_pynacl", msg, retryable=False)
+                return False
 
         app = web.Application(client_max_size=WEBHOOK_BODY_MAX_BYTES)
         app.router.add_post(self._webhook_path, self._handle_webhook)
@@ -334,8 +360,18 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
             return False
 
         try:
-            verify_key = VerifyKey(bytes.fromhex(self._public_key))
-            verify_key.verify(f"{timestamp}|".encode("utf-8") + body, bytes.fromhex(signature))
+            import base64
+
+            key_bytes = base64.b64decode(self._public_key)
+            if len(key_bytes) != 32:
+                logger.warning("[telnyx_sms] public key decoded to %d bytes, expected 32", len(key_bytes))
+                return False
+            sig_bytes = base64.b64decode(signature)
+            if len(sig_bytes) != 64:
+                logger.warning("[telnyx_sms] signature decoded to %d bytes, expected 64", len(sig_bytes))
+                return False
+            verify_key = VerifyKey(key_bytes)
+            verify_key.verify(f"{timestamp}|".encode("utf-8") + body, sig_bytes)
             return True
         except Exception:
             return False
