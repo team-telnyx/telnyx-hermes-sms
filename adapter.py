@@ -104,13 +104,24 @@ def _extract_media_urls(metadata: Optional[Dict[str, Any]]) -> list[str]:
     return [url for url in urls if url.startswith(("http://", "https://"))]
 
 
+# Maximum size for inbound MMS media downloads (5 MB).
+_MMS_DOWNLOAD_MAX_BYTES = 5 * 1024 * 1024
+_MMS_DOWNLOAD_TIMEOUT = 15  # seconds
+_MMS_ALLOWED_CONTENT_TYPES = frozenset({
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "video/mp4", "video/3gpp",
+    "audio/mpeg", "audio/ogg", "audio/amr",
+    "application/pdf",
+})
+
+
 def check_requirements() -> bool:
-    """Return True when runtime deps and the minimum Telnyx credential exist."""
+    """Return True when runtime deps and the minimum Telnyx credentials exist."""
     try:
         import aiohttp  # noqa: F401
     except ImportError:
         return False
-    return bool(_env("TELNYX_API_KEY"))
+    return bool(_env("TELNYX_API_KEY") and _env("TELNYX_SMS_FROM_NUMBER"))
 
 
 def validate_config(config: PlatformConfig) -> bool:
@@ -397,9 +408,10 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
         if not isinstance(inner, dict):
             return web.json_response({"ok": True})
 
-        if event_type and event_type != "message.received":
-            # Delivery receipts and other message lifecycle events are useful
-            # for logging but should not trigger an agent response.
+        if event_type != "message.received":
+            # Require explicit message.received; delivery receipts and other
+            # lifecycle events should not trigger agent responses.  Payloads
+            # that lack event_type entirely are also rejected.
             return web.json_response({"ok": True})
 
         from_number = _first_phone(inner.get("from")) or _first_phone(inner.get("from_number"))
@@ -425,10 +437,11 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
             return web.json_response({"ok": True})
 
         logger.info(
-            "[telnyx_sms] inbound from %s -> %s: %s",
+            "[telnyx_sms] inbound from %s -> %s (%d chars, %d media)",
             redact_phone(from_number),
             redact_phone(to_number),
-            text[:80],
+            len(text),
+            len(media_urls),
         )
         source = self.build_source(
             chat_id=from_number,
@@ -438,20 +451,80 @@ class TelnyxSmsAdapter(BasePlatformAdapter):
             user_name=from_number,
             message_id=message_id or None,
         )
+        # Download inbound MMS media to bounded temp files so Hermes gets
+        # local paths instead of remote Telnyx URLs that may expire or leak PII.
+        local_media = await self._download_inbound_media(media_urls)
+
         event = MessageEvent(
             text=text or "[MMS attachment]",
             message_type=MessageType.TEXT,
             source=source,
             raw_message=payload,
             message_id=message_id or None,
-            media_urls=media_urls,
-            media_types=["image" if url.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")) else "document" for url in media_urls],
+            media_urls=local_media,
+            media_types=["image" if path.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")) else "document" for path in local_media],
         )
 
-        task = asyncio.create_task(self.handle_message(event))
+        task = asyncio.ensure_future(self._safe_handle_message(event))
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
         return web.json_response({"ok": True})
+
+    async def _safe_handle_message(self, event: MessageEvent) -> None:
+        """Wrap handle_message with exception logging."""
+        try:
+            await self.handle_message(event)
+        except Exception:
+            logger.exception("[telnyx_sms] unhandled error in handle_message for %s", event.message_id)
+
+    async def _download_inbound_media(self, urls: list[str]) -> list[str]:
+        """Download remote MMS media to local temp files with size/type checks.
+
+        Returns a list of local file paths.  Skips URLs that fail validation.
+        """
+        import tempfile
+        import aiohttp as _aiohttp
+
+        if not urls:
+            return []
+
+        local_paths: list[str] = []
+        session = self._http_session or _aiohttp.ClientSession(
+            timeout=_aiohttp.ClientTimeout(total=_MMS_DOWNLOAD_TIMEOUT)
+        )
+        own_session = session is not self._http_session
+        try:
+            for url in urls:
+                try:
+                    async with session.get(url) as resp:
+                        if resp.status != 200:
+                            logger.warning("[telnyx_sms] MMS download %s returned %d", url[:120], resp.status)
+                            continue
+                        content_type = (resp.content_type or "").split(";")[0].strip().lower()
+                        if content_type and content_type not in _MMS_ALLOWED_CONTENT_TYPES:
+                            logger.warning("[telnyx_sms] MMS download %s disallowed content-type: %s", url[:120], content_type)
+                            continue
+                        ext_map = {
+                            "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
+                            "image/webp": ".webp", "video/mp4": ".mp4", "video/3gpp": ".3gp",
+                            "audio/mpeg": ".mp3", "audio/ogg": ".ogg", "audio/amr": ".amr",
+                            "application/pdf": ".pdf",
+                        }
+                        ext = ext_map.get(content_type, ".bin")
+                        data = await resp.content.read(_MMS_DOWNLOAD_MAX_BYTES + 1)
+                        if len(data) > _MMS_DOWNLOAD_MAX_BYTES:
+                            logger.warning("[telnyx_sms] MMS download %s exceeds %d bytes, skipping", url[:120], _MMS_DOWNLOAD_MAX_BYTES)
+                            continue
+                        tmp = tempfile.NamedTemporaryFile(prefix="telnyx_mms_", suffix=ext, delete=False)
+                        tmp.write(data)
+                        tmp.close()
+                        local_paths.append(tmp.name)
+                except Exception as exc:
+                    logger.warning("[telnyx_sms] MMS download failed for %s: %s", url[:120], exc)
+        finally:
+            if own_session:
+                await session.close()
+        return local_paths
 
 
 async def _standalone_send(

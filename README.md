@@ -79,8 +79,9 @@ hermes plugins enable telnyx-sms-platform  # or: hermes plugins enable telnyx_sm
 Then configure credentials and enable the platform:
 
 ```bash
-cp .env.example ~/.hermes/.env
-# Edit ~/.hermes/.env with your Telnyx values.
+# Append Telnyx vars to your existing Hermes .env (do NOT overwrite):
+cat .env.example >> ~/.hermes/.env
+# Then edit ~/.hermes/.env — remove duplicates, fill in your Telnyx values.
 ```
 
 ```yaml
@@ -129,7 +130,8 @@ No core Hermes code changes are required. Hermes' platform registry handles:
 | Sender | `TELNYX_SMS_FROM_NUMBER` |
 | Optional profile | `TELNYX_MESSAGING_PROFILE_ID` |
 | Message limit | 1600 chars per chunk |
-| MMS | Public `media_urls` only |
+| MMS outbound | Public `media_urls` only (no local file upload) |
+| MMS inbound | Media auto-downloaded to local temp files (5 MB / file limit) |
 
 ## Environment variables
 
@@ -140,12 +142,22 @@ export TELNYX_API_KEY="KEY..."
 export TELNYX_SMS_FROM_NUMBER="+15551234567"
 ```
 
+Required for inbound SMS — set **at least one** so Hermes knows who can talk to
+your bot:
+
+```bash
+# Allowlist specific numbers (recommended):
+export TELNYX_SMS_ALLOWED_USERS="+15551230001,+15551230002"
+# OR allow any sender (dev/testing only):
+export TELNYX_SMS_ALLOW_ALL_USERS=true
+```
+
 Recommended production hardening:
 
 ```bash
-export TELNYX_PUBLIC_KEY="<Telnyx webhook signing public key>"
+# Get your public key: https://portal.telnyx.com → Account Settings → Public Key
+export TELNYX_PUBLIC_KEY="<base64 Ed25519 public key from GET /v2/public_key>"
 export TELNYX_SMS_REQUIRE_SIGNATURE=true
-export TELNYX_SMS_ALLOWED_USERS="+15551230001,+15551230002"
 ```
 
 Optional:
