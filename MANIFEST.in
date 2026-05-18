@@ -1,0 +1,7 @@
+include plugin.yaml
+include __init__.py
+include adapter.py
+include .env.example
+include LICENSE
+include README.md
+include SKILL.md

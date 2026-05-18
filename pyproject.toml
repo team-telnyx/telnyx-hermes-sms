@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Telnyx SMS/MMS platform adapter contribution for Hermes Agent"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Telnyx AI FDE" }]
 dependencies = [
   "aiohttp>=3.9",

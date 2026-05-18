@@ -34,7 +34,7 @@ Requirements:
 git clone https://github.com/team-telnyx/telnyx-hermes-sms.git
 cd telnyx-hermes-sms
 export HERMES_AGENT_ROOT="$HOME/.hermes/hermes-agent"  # adjust if needed
-uv run --extra test python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
+uv run --extra test python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py tests/test_telnyx_sms_plugin_loading.py -q
 ```
 
 Without `uv`, use any Python 3.10+ virtualenv:
@@ -44,7 +44,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[test]"
 export HERMES_AGENT_ROOT="$HOME/.hermes/hermes-agent"
-python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
+python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py tests/test_telnyx_sms_plugin_loading.py -q
 ```
 
 ## Integration into hermes-agent
@@ -206,7 +206,7 @@ message lifecycle webhooks so delivery receipts do not trigger agent replies.
 
 ```bash
 # No credentials needed; does not send SMS
-uv run --extra test python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py -q
+uv run --extra test python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.py tests/test_telnyx_sms_plugin_loading.py -q
 
 # Full suite; live test skips unless explicitly enabled
 uv run --extra test python -m pytest -q
