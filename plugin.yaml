@@ -1,0 +1,65 @@
+name: telnyx-sms-platform
+label: Telnyx SMS
+kind: platform
+version: 1.0.0
+description: >
+  Telnyx SMS/MMS gateway adapter for Hermes Agent. Runs an aiohttp webhook
+  server that receives Telnyx Messaging webhooks and relays messages between
+  phone numbers and the Hermes agent. Outbound sends use the Telnyx Messaging
+  API and support SMS plus MMS media URLs.
+author: Telnyx AI FDE
+requires_env:
+  - name: TELNYX_API_KEY
+    description: "Telnyx API key used for Messaging API sends"
+    prompt: "Telnyx API key"
+    url: "https://portal.telnyx.com/#/app/api-keys"
+    password: true
+  - name: TELNYX_SMS_FROM_NUMBER
+    description: "Telnyx-owned E.164 number used as the outbound SMS sender"
+    prompt: "SMS from number"
+    password: false
+optional_env:
+  - name: TELNYX_MESSAGING_PROFILE_ID
+    description: "Optional Telnyx Messaging Profile ID to attach on outbound sends"
+    prompt: "Messaging Profile ID"
+    password: false
+  - name: TELNYX_SMS_API_BASE
+    description: "Telnyx API base URL override (default: https://api.telnyx.com/v2)"
+    prompt: "Telnyx API base URL"
+    password: false
+  - name: TELNYX_SMS_WEBHOOK_HOST
+    description: "Webhook bind host (default: 127.0.0.1)"
+    prompt: "Webhook host"
+    password: false
+  - name: TELNYX_SMS_WEBHOOK_PORT
+    description: "Webhook listen port (default: 8087)"
+    prompt: "Webhook port"
+    password: false
+  - name: TELNYX_SMS_WEBHOOK_PATH
+    description: "Webhook path (default: /webhooks/telnyx/sms)"
+    prompt: "Webhook path"
+    password: false
+  - name: TELNYX_PUBLIC_KEY
+    description: "Telnyx account public key for Ed25519 webhook signature verification"
+    prompt: "Telnyx public key"
+    password: true
+  - name: TELNYX_SMS_REQUIRE_SIGNATURE
+    description: "Require valid Telnyx webhook signatures (recommended in production)"
+    prompt: "Require webhook signature? (true/false)"
+    password: false
+  - name: TELNYX_SMS_SIGNATURE_TOLERANCE
+    description: "Webhook signature timestamp tolerance in seconds (default: 300; 0 disables freshness check)"
+    prompt: "Signature tolerance seconds"
+    password: false
+  - name: TELNYX_SMS_ALLOWED_USERS
+    description: "Comma-separated E.164 phone numbers allowed to talk to the bot"
+    prompt: "Allowed phone numbers"
+    password: false
+  - name: TELNYX_SMS_ALLOW_ALL_USERS
+    description: "Allow any sender phone number to talk to the bot (dev only)"
+    prompt: "Allow all users? (true/false)"
+    password: false
+  - name: TELNYX_SMS_HOME_CHANNEL
+    description: "Default E.164 phone number for cron / notification delivery"
+    prompt: "Home phone number"
+    password: false
