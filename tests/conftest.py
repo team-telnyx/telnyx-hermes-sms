@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-def _find_hermes_root() -> Path:
+def _find_hermes_root() -> Path | None:
     """Locate a Hermes Agent checkout for tests that import gateway modules."""
     candidates = []
     env_root = os.getenv("HERMES_AGENT_ROOT")
@@ -17,20 +17,20 @@ def _find_hermes_root() -> Path:
     for candidate in candidates:
         if (candidate / "gateway" / "platforms" / "base.py").exists():
             return candidate
-    raise RuntimeError(
-        "Hermes Agent checkout not found. Set HERMES_AGENT_ROOT to the local "
-        "hermes-agent repository before running tests."
-    )
+    return None
 
 
 HERMES_ROOT = _find_hermes_root()
-if str(HERMES_ROOT) not in sys.path:
+if HERMES_ROOT is not None and str(HERMES_ROOT) not in sys.path:
     sys.path.insert(0, str(HERMES_ROOT))
 
 
 def _ensure_telnyx_sms_registered():
     """Pre-register telnyx_sms so Platform('telnyx_sms') works in all tests."""
-    from gateway.platform_registry import PlatformEntry, platform_registry
+    try:
+        from gateway.platform_registry import PlatformEntry, platform_registry
+    except (ImportError, ModuleNotFoundError):
+        return
 
     if not platform_registry.is_registered("telnyx_sms"):
         platform_registry.register(

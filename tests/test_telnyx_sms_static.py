@@ -36,12 +36,19 @@ def test_register_platform_shape():
 
 
 def test_api_constants():
-    import adapter
+    tree = ast.parse((ROOT / 'adapter.py').read_text())
+    constants = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            try:
+                constants[node.targets[0].id] = ast.literal_eval(node.value)
+            except Exception:
+                continue
 
-    assert adapter.TELNYX_API_BASE == 'https://api.telnyx.com/v2'
-    assert adapter.TELNYX_MESSAGES_URL.endswith('/messages')
-    assert adapter.DEFAULT_WEBHOOK_PATH == '/webhooks/telnyx/sms'
-    assert adapter.MAX_SMS_LENGTH == 1600
+    assert constants['TELNYX_API_BASE'] == 'https://api.telnyx.com/v2'
+    assert constants['DEFAULT_WEBHOOK_PATH'] == '/webhooks/telnyx/sms'
+    assert constants['MAX_SMS_LENGTH'] == 1600
+    assert "TELNYX_MESSAGES_URL = f\"{TELNYX_API_BASE}/messages\"" in (ROOT / 'adapter.py').read_text()
 
 
 def test_plugin_package_entrypoint_exists():
