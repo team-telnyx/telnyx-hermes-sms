@@ -54,10 +54,17 @@ python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.p
 The repository now ships an installer CLI, so you can install the plugin from a
 tagged Git ref instead of manually copying files.
 
-Recommended production/stable path once a tag exists:
+Recommended stable path once a Git tag/release exists:
 
 ```bash
 pipx install "git+https://github.com/team-telnyx/telnyx-hermes-sms.git@v0.2.0"
+telnyx-hermes-sms-install
+```
+
+Install directly from the current default branch today:
+
+```bash
+pipx install "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
 telnyx-hermes-sms-install
 ```
 
@@ -116,6 +123,8 @@ registry can discover `telnyx_sms`.
 - `pyproject.toml` now declares a real setuptools build backend, so wheels and
   sdists can be built and tagged cleanly.
 - The CLI entry point is `telnyx-hermes-sms-install`.
+- As of 2026-05-31, the public GitHub repo has no tags or releases yet, so use
+  the default-branch install command above until a release is cut.
 - To publish the documented stable install command, tag and release `v0.2.0`
   (or the final chosen version) after review.
 
