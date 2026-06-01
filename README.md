@@ -54,17 +54,29 @@ python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.p
 The repository now ships an installer CLI, so you can install the plugin from a
 tagged Git ref instead of manually copying files.
 
+Quickest downloadable path today:
+
+```bash
+pipx install --python python3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
+telnyx-hermes-sms-install
+```
+
+If your machine's default `python3` is older than 3.10, do not use the generic
+`python3 -m pip ...` examples below unchanged. On macOS in particular,
+`python3 --version` may still be 3.9.x, which will fail because this package
+requires Python 3.10+.
+
 Recommended stable path once a Git tag/release exists:
 
 ```bash
-pipx install "git+https://github.com/team-telnyx/telnyx-hermes-sms.git@v0.2.0"
+pipx install --python python3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git@v0.2.0"
 telnyx-hermes-sms-install
 ```
 
 Install directly from the current default branch today:
 
 ```bash
-pipx install "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
+pipx install --python python3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
 telnyx-hermes-sms-install
 ```
 
@@ -73,7 +85,14 @@ Local checkout / pre-release validation path:
 ```bash
 git clone https://github.com/team-telnyx/telnyx-hermes-sms.git
 cd telnyx-hermes-sms
-python3 -m pip install .
+python3.12 -m pip install .
+telnyx-hermes-sms-install
+```
+
+If you prefer `uv`, this also works without mutating your global Python setup:
+
+```bash
+uv tool install --python 3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
 telnyx-hermes-sms-install
 ```
 
