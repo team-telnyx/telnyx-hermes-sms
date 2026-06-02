@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "telnyx-hermes-sms"
-version = "0.1.0"
+version = "0.2.0"
 description = "Telnyx SMS/MMS platform adapter contribution for Hermes Agent"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -9,6 +13,9 @@ authors = [{ name = "Telnyx AI FDE" }]
 dependencies = [
   "aiohttp>=3.9",
 ]
+
+[project.scripts]
+telnyx-hermes-sms-install = "telnyx_hermes_sms.installer:main"
 
 [project.optional-dependencies]
 signature = ["PyNaCl>=1.5"]
@@ -25,3 +32,11 @@ pythonpath = ["."]
 markers = [
   "live: requires live Telnyx credentials and sends a real SMS",
 ]
+
+[tool.setuptools]
+py-modules = ["adapter"]
+packages = ["telnyx_hermes_sms"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+telnyx_hermes_sms = ["plugin.yaml", ".env.example"]

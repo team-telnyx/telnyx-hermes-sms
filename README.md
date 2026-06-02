@@ -51,21 +51,63 @@ python -m pytest tests/test_telnyx_sms_static.py tests/test_telnyx_sms_runtime.p
 
 ### User plugin install
 
-Copy this repository's plugin files into a Hermes plugin directory:
+The repository now ships an installer CLI, so you can install the plugin from a
+tagged Git ref instead of manually copying files.
+
+Quickest downloadable path today:
 
 ```bash
-mkdir -p ~/.hermes/plugins/telnyx_sms
-cp __init__.py adapter.py plugin.yaml ~/.hermes/plugins/telnyx_sms/
+pipx install --python python3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
+telnyx-hermes-sms-install
 ```
 
-Expected plugin tree:
+If your machine's default `python3` is older than 3.10, do not use the generic
+`python3 -m pip ...` examples below unchanged. On macOS in particular,
+`python3 --version` may still be 3.9.x, which will fail because this package
+requires Python 3.10+.
+
+Recommended stable path once a Git tag/release exists:
+
+```bash
+pipx install --python python3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git@v0.2.0"
+telnyx-hermes-sms-install
+```
+
+Install directly from the current default branch today:
+
+```bash
+pipx install --python python3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
+telnyx-hermes-sms-install
+```
+
+Local checkout / pre-release validation path:
+
+```bash
+git clone https://github.com/team-telnyx/telnyx-hermes-sms.git
+cd telnyx-hermes-sms
+python3.12 -m pip install .
+telnyx-hermes-sms-install
+```
+
+If you prefer `uv`, this also works without mutating your global Python setup:
+
+```bash
+uv tool install --python 3.12 "git+https://github.com/team-telnyx/telnyx-hermes-sms.git"
+telnyx-hermes-sms-install
+```
+
+By default the installer writes the Hermes plugin directory at:
 
 ```text
 ~/.hermes/plugins/telnyx_sms/
   plugin.yaml
   __init__.py
   adapter.py
+  .env.example
 ```
+
+Use `telnyx-hermes-sms-install --target-dir /custom/path/telnyx_sms` to install
+somewhere else, or `--force` to refresh an existing plugin checkout.
 
 Enable the plugin in Hermes. Depending on the Hermes CLI version, use the
 plugin manifest name/key shown by `hermes plugins list`; for this plugin that is
@@ -79,8 +121,8 @@ hermes plugins enable telnyx-sms-platform  # or: hermes plugins enable telnyx_sm
 Then configure credentials and enable the platform:
 
 ```bash
-# Append Telnyx vars to your existing Hermes .env (do NOT overwrite):
-cat .env.example >> ~/.hermes/.env
+# Append the installed template to your existing Hermes .env (do NOT overwrite):
+cat ~/.hermes/plugins/telnyx_sms/.env.example >> ~/.hermes/.env
 # Then edit ~/.hermes/.env — remove duplicates, fill in your Telnyx values.
 ```
 
@@ -94,6 +136,16 @@ gateway:
 
 Restart the Hermes gateway after installing/enabling the plugin so the platform
 registry can discover `telnyx_sms`.
+
+### Packaging and release notes
+
+- `pyproject.toml` now declares a real setuptools build backend, so wheels and
+  sdists can be built and tagged cleanly.
+- The CLI entry point is `telnyx-hermes-sms-install`.
+- As of 2026-05-31, the public GitHub repo has no tags or releases yet, so use
+  the default-branch install command above until a release is cut.
+- To publish the documented stable install command, tag and release `v0.2.0`
+  (or the final chosen version) after review.
 
 ### Bundled upstream plugin path
 

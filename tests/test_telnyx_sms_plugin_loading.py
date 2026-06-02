@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 
@@ -14,6 +15,9 @@ def test_directory_plugin_entrypoint_registers_platform(monkeypatch):
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
+    fake_adapter = types.ModuleType(f'{module_name}.adapter')
+    fake_adapter.register = lambda ctx: ctx.register_platform(name='telnyx_sms', label='Telnyx SMS')
+    sys.modules[f'{module_name}.adapter'] = fake_adapter
     assert spec.loader is not None
     spec.loader.exec_module(module)
 

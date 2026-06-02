@@ -5,3 +5,4 @@ include .env.example
 include LICENSE
 include README.md
 include SKILL.md
+recursive-include telnyx_hermes_sms plugin.yaml .env.example
