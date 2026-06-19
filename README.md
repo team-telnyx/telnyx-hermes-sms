@@ -8,6 +8,12 @@ It is a **plugin-first platform adapter**. Hermes already has a built-in
 keeps Twilio untouched and adds Telnyx as `telnyx_sms` so the integration is
 safe, reversible, and consistent with Hermes' platform-plugin architecture.
 
+## Setup Walkthrough
+
+Watch the full setup walkthrough:
+
+[![Hermes SMS/MMS setup walkthrough](docs/assets/hermes-sms-mms-setup-walkthrough.png)](docs/assets/hermes-sms-mms-setup-walkthrough.mp4)
+
 ## What's inside
 
 | File | Purpose |
